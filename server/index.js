@@ -1,5 +1,6 @@
 const Telegraf = require("telegraf");
 require("dotenv").config();
+const _ = require("lodash");
 const axios = require("axios");
 const mongoose = require("mongoose");
 const session = require("telegraf/session");
@@ -17,6 +18,7 @@ const {
   connectToDatabase,
   userCollection,
   Transaction,
+  connectToMysql,
 } = require("./database");
 const express = require("express");
 const cors = require("cors");
@@ -52,6 +54,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 });
 
 (async () => await connectToDatabase())();
+let db = null;
+(async () => (db = await connectToMysql()))();
 
 const stage = new Stage([
   currencyScene,
@@ -70,14 +74,26 @@ const start = require("./commands/start");
 start(bot);
 
 bot.hears("📥 Deposit", async (ctx) => {
-  const user = await userCollection.findOne({ user_id: ctx.from.id });
+  // const user = await userCollection.findOne({ user_id: ctx.from.id });
+  let user = {};
+  let [rows] = await db.execute("SELECT * FROM users WHERE tg_id = ?", [
+    ctx.from.id,
+  ]);
+  user.id = rows[0].id;
+  user.phone_number = rows[0].phone_number;
+  user.first_name = rows[0].first_name;
+  user.tg_id = rows[0].tg_id;
+  user.created_at = rows[0].created_at;
+  console.log(user);
 
-  if (user) {
+  if (!_.isEmpty(user)) {
     ctx.scene.enter("currency");
   } else {
     askForContact(bot, ctx);
   }
 });
+
+// let [rows, fields] = await conn.execute('select ?+? as sum', [2, 2]);
 
 const back = require("./commands/back");
 back(bot);

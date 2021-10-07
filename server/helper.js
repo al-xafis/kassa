@@ -1,4 +1,5 @@
-const { User } = require("./database");
+const { User, db } = require("./database");
+const { format } = require("date-fns");
 
 const askForContact = (bot, ctx) => {
   bot.telegram.sendMessage(
@@ -22,6 +23,26 @@ const checkContactOnMessage = (bot) => {
       console.log("there is a contact");
       new User(ctx.update.message.contact).save();
       console.log(ctx.update.message.contact);
+      let phone_number = ctx.update.message.contact.phone_number;
+      let first_name = ctx.update.message.contact.first_name;
+      let tg_id = ctx.update.message.contact.user_id;
+      let date = format(Date.now(), "Pp");
+      try {
+        db.query(
+          "INSERT INTO users (phone_number, first_name, tg_id, created_at) VALUES(?,?,?,?)",
+          [phone_number, first_name, tg_id, date],
+          (err, result) => {
+            if (err) {
+              console.log(err);
+            }
+            if (result) {
+              console.log(result);
+            }
+          }
+        );
+      } catch (error) {
+        console.log(error);
+      }
       bot.telegram.sendMessage(ctx.chat.id, "Меню", {
         reply_markup: {
           keyboard: [
