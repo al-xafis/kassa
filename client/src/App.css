@@ -1,0 +1,52 @@
+.App {
+  background-color: #F3F4F6;
+}
+
+.table__wrapper {
+  border: 1px solid lightgray;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.table {
+  display: table;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table__head {
+  background-color: #F9FAFB;
+}
+
+.table__row {
+  border-top: 1px solid #E4E7EB;
+  width: 100%;
+}
+
+.table__header {
+  font-size: 14px;
+  color: #6A7280;
+  text-align: left;
+  padding: 12px 24px;
+  text-transform: uppercase;
+  /* background-color: yellow; */
+}
+
+.table__data {
+  font-size: 15px;
+  background-color: #FFFFFF;
+  padding: 16px 24px;
+}
+
+.button {
+  border: none;
+  background-color: #198753;
+  padding: 10px 12px;
+  border-radius: 5px;
+  color: #fff;
+  font-family: inherit;
+}
+
+.button:hover {
+  background-color: #146a41;
+}
