@@ -46,7 +46,7 @@ class SceneGenerator {
       await kbBack(ctx, "Введите ID аккаунта");
     });
     id.on("text", async (ctx) => {
-      if (ctx.message.text.match(/\d{5,}/)) {
+      if (ctx.message.text.match(/^\d{6,12}$/)) {
         ctx.db.id = ctx.message.text;
         await ctx.reply("ID введен");
         await ctx.scene.enter("card");
@@ -58,14 +58,17 @@ class SceneGenerator {
         await ctx.reply("Это не ID");
       }
     });
-
+    console.log("test");
     return id;
   }
 
   cardScene() {
     const card = new Scene("card");
     card.enter(async (ctx) => {
-      await kbBack(ctx, "Введите номер карты");
+      await kbBack(
+        ctx,
+        "Введите номер карты \nПример: 1234 1234 1234 1234, 1234123412431234"
+      );
     });
     card.on("text", async (ctx) => {
       if (ctx.message.text.match(/\b\d{16}\b|\b\d{4} \d{4} \d{4} \d{4}\b/)) {
@@ -88,13 +91,18 @@ class SceneGenerator {
   dateScene() {
     const date = new Scene("date");
     date.enter(async (ctx) => {
-      await kbBack(ctx, "Введите срок карты");
+      await kbBack(ctx, "Введите срок карты \nПример: 0526, 05/26");
       let newId = await getNextSequence("orderid");
       ctx.db.newId = newId;
     });
     date.on("text", async (ctx) => {
-      if (ctx.message.text.match(/\b\d{4}\b/)) {
-        ctx.db.date = ctx.message.text;
+      if (ctx.message.text.match(/\b\d\d\/?\d\d\b/)) {
+        if (ctx.message.text.includes("/")) {
+          ctx.db.date = ctx.message.text.replace("/", "");
+        } else {
+          ctx.db.date = ctx.message.text;
+        }
+        console.log(ctx.db.date);
         await ctx.reply("срок карты введен");
         try {
           const res = await axios.post(
@@ -118,6 +126,9 @@ class SceneGenerator {
           console.log("from cards create");
         } catch (error) {
           console.log("catch from cards create: " + error);
+          await ctx.reply("Неправильная карта или код");
+          await ctx.scene.leave();
+          await leave(ctx);
         }
         await ctx.scene.enter("amount");
       } else if (ctx.message.text == "◀️ Back") {
@@ -134,7 +145,10 @@ class SceneGenerator {
   amountScene() {
     const amount = new Scene("amount");
     amount.enter(async (ctx) => {
-      await kbBack(ctx, "Введите сумму депозита");
+      await kbBack(
+        ctx,
+        "Введите сумму депозита \nПример: 20000, 50000, 100000"
+      );
     });
 
     // amount.leave(async (ctx) => {
@@ -300,9 +314,10 @@ class SceneGenerator {
             } catch (error) {
               console.log(error);
             }
+            await ctx.reply(`ID`);
           } else {
             console.log(res.data.error);
-            ctx.scene.reenter();
+            await ctx.reply("Неправильный код");
           }
 
           console.log("from pay receipt");
@@ -310,6 +325,7 @@ class SceneGenerator {
           console.log("catch from receipts pay: " + error);
         }
 
+        // await ctx.reply(`ID`);
         await ctx.scene.leave();
         await leave(ctx);
       } else if (ctx.message.text == "◀️ Back") {
