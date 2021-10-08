@@ -19,6 +19,7 @@ const {
   userCollection,
   Transaction,
   connectToMysql,
+  // db,
 } = require("./database");
 const express = require("express");
 const cors = require("cors");
@@ -35,27 +36,42 @@ app.listen(port, () => {
   console.log("Server is running on port: " + port);
 });
 
+(async () => await connectToDatabase())();
+let db = null;
+(async () => (db = await connectToMysql()))();
+
 app.get("/", async (req, res) => {
-  const transactions = await Transaction.find({ completed: false });
-  res.status(200).json(transactions);
+  // const transactions = await Transaction.find({ completed: false });
+  //mysql
+  const [row] = await db.execute(
+    "SELECT * FROM transactions WHERE completed = ?",
+    [0]
+  );
+  res.status(200).json(row);
+  //mysql
+  // res.status(200).json(transactions);
 });
 
 app.put("/", async (req, res) => {
-  const transaction = await Transaction.findOneAndUpdate(
-    { id: req.body.id },
-    { completed: true },
-    { upsert: true }
-  );
+  // const transaction = await Transaction.findOneAndUpdate(
+  //   { id: req.body.id },
+  //   { completed: true },
+  //   { upsert: true }
+  // );
+  try {
+    await db.execute("UPDATE transactions SET completed = ? WHERE id = ?", [
+      1,
+      req.body.id,
+    ]);
+  } catch (error) {
+    console.log(error);
+  }
   res.status(200).json("Updated");
 });
 
 const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: false,
 });
-
-(async () => await connectToDatabase())();
-let db = null;
-(async () => (db = await connectToMysql()))();
 
 const stage = new Stage([
   currencyScene,
@@ -76,15 +92,17 @@ start(bot);
 bot.hears("📥 Deposit", async (ctx) => {
   // const user = await userCollection.findOne({ user_id: ctx.from.id });
   let user = {};
-  let [rows] = await db.execute("SELECT * FROM users WHERE tg_id = ?", [
+  let [rows] = await db.query("SELECT * FROM users WHERE tg_id = ?", [
     ctx.from.id,
   ]);
-  user.id = rows[0].id;
-  user.phone_number = rows[0].phone_number;
-  user.first_name = rows[0].first_name;
-  user.tg_id = rows[0].tg_id;
-  user.created_at = rows[0].created_at;
-  console.log(user);
+  if (rows.length > 0) {
+    user.id = rows[0].id;
+    user.phone_number = rows[0].phone_number;
+    user.first_name = rows[0].first_name;
+    user.tg_id = rows[0].tg_id;
+    user.created_at = rows[0].created_at;
+    console.log(user);
+  }
 
   if (!_.isEmpty(user)) {
     ctx.scene.enter("currency");
@@ -92,8 +110,6 @@ bot.hears("📥 Deposit", async (ctx) => {
     askForContact(bot, ctx);
   }
 });
-
-// let [rows, fields] = await conn.execute('select ?+? as sum', [2, 2]);
 
 const back = require("./commands/back");
 back(bot);

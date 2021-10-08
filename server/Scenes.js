@@ -1,16 +1,17 @@
 const Scene = require("telegraf/scenes/base");
 const mongoose = require("mongoose");
-const { User, Transaction } = require("./database");
+const { User, Transaction, connectToMysql } = require("./database");
 const axios = require("axios");
+const { format } = require("date-fns");
 
+let db = null;
+(async () => (db = await connectToMysql()))();
 class SceneGenerator {
   currencyScene() {
     const currency = new Scene("currency");
     currency.enter(async (ctx) => {
-      // await kbBack(ctx, "Выберите валюту");
       await ctx.telegram.sendMessage(ctx.chat.id, "Выберите валюту", {
         reply_markup: {
-          // keyboard: [[{ text: "◀️ Back" }]],
           inline_keyboard: [
             [
               { text: "USD", callback_data: "USD" },
@@ -188,6 +189,7 @@ class SceneGenerator {
         await ctx.scene.enter("code");
       } else if (ctx.message.text == "◀️ Back") {
         await ctx.scene.leave();
+        await leave(ctx);
       } else {
         console.log("this is not a number");
         await ctx.reply("Это не номер");
@@ -272,49 +274,81 @@ class SceneGenerator {
           );
 
           if (!res.data.error) {
-            await new Transaction({
-              id: ctx.db.newId,
-              x_id: ctx.db.id,
-              currency: ctx.db.currency,
-              card_number: ctx.db.card_number,
-              card_date: ctx.db.date,
-              amount: ctx.db.amountInput / 100,
-              completed: false,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }).save();
-            await User.findOneAndUpdate(
-              {
-                user_id: ctx.from.id,
-              },
-              {
-                $push: {
-                  history: {
-                    id: ctx.db.newId,
-                  },
-                },
-              },
-              { upsert: true }
-            );
-            let phone = null;
+            // await new Transaction({
+            //   id: ctx.db.newId,
+            //   x_id: ctx.db.id,
+            //   currency: ctx.db.currency,
+            //   card_number: ctx.db.card_number,
+            //   card_date: ctx.db.date,
+            //   amount: ctx.db.amountInput / 100,
+            //   completed: false,
+            //   createdAt: new Date(),
+            //   updatedAt: new Date(),
+            // }).save();
+            // await User.findOneAndUpdate(
+            //   {
+            //     user_id: ctx.from.id,
+            //   },
+            //   {
+            //     $push: {
+            //       history: {
+            //         id: ctx.db.newId,
+            //       },
+            //     },
+            //   },
+            //   { upsert: true }
+            // );
+            // let phone = null;
+            // try {
+            //   let user = await User.findOne({
+            //     history: { $elemMatch: { id: ctx.db.newId } }, //add id field to User collection
+            //   });
+            //   phone = user.phone_number;
+            // } catch (error) {
+            //   console.log(error);
+            // }
+            // try {
+            //   await Transaction.findOneAndUpdate(
+            //     { id: ctx.db.newId },
+            //     { phone_number: phone }, //add phone_number field to Transaction collection
+            //     { upsert: true }
+            //   );
+            // } catch (error) {
+            //   console.log(error);
+            // }
+            await ctx.reply(`ID`);
+            // mysql
+            let user_id = null;
+            let phone_number = null;
             try {
-              let user = await User.findOne({
-                history: { $elemMatch: { id: ctx.db.newId } }, //add id field to User collection
-              });
-              phone = user.phone_number;
+              let [rows] = await db.execute(
+                "SELECT * FROM users WHERE tg_id = ?",
+                [ctx.from.id]
+              );
+              user_id = rows[0].id;
+              phone_number = rows[0].phone_number;
+              console.log(user_id);
             } catch (error) {
               console.log(error);
             }
             try {
-              await Transaction.findOneAndUpdate(
-                { id: ctx.db.newId },
-                { phone_number: phone }, //add phone_number field to Transaction collection
-                { upsert: true }
+              await db.execute(
+                "INSERT INTO transactions (user_id, phone_number, x_id, card_number, card_date, currency, amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                  user_id,
+                  phone_number,
+                  ctx.db.id,
+                  ctx.db.card_number,
+                  ctx.db.date,
+                  ctx.db.currency,
+                  ctx.db.amountInput / 100,
+                  format(Date.now(), "Pp"),
+                ]
               );
             } catch (error) {
               console.log(error);
             }
-            await ctx.reply(`ID`);
+            //mysql
           } else {
             console.log(res.data.error);
             await ctx.reply("Неправильный код");

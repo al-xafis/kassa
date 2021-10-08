@@ -11,7 +11,7 @@ function App() {
     x_id: number,
     phone_number: string,
     currency: string,
-    createdAt: string,
+    created_at: string,
   }
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -64,7 +64,7 @@ function App() {
         </thead>
         <tbody>
           {loading===false && orders.map(order => {
-            let time = format(order.createdAt);
+            let time = format(order.created_at);
 
             return (<tr className="table__row" key={order.id}>
             <td className="table__data">{order.id}</td>

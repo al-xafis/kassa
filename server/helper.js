@@ -1,5 +1,8 @@
-const { User, db } = require("./database");
+const { User, connectToMysql } = require("./database");
 const { format } = require("date-fns");
+
+let db = null;
+(async () => (db = await connectToMysql()))();
 
 const askForContact = (bot, ctx) => {
   bot.telegram.sendMessage(
@@ -21,14 +24,14 @@ const checkContactOnMessage = (bot) => {
   bot.on("message", async (ctx) => {
     if (ctx.update.message.contact) {
       console.log("there is a contact");
-      new User(ctx.update.message.contact).save();
+      // new User(ctx.update.message.contact).save();
       console.log(ctx.update.message.contact);
       let phone_number = ctx.update.message.contact.phone_number;
       let first_name = ctx.update.message.contact.first_name;
       let tg_id = ctx.update.message.contact.user_id;
       let date = format(Date.now(), "Pp");
       try {
-        db.query(
+        await db.query(
           "INSERT INTO users (phone_number, first_name, tg_id, created_at) VALUES(?,?,?,?)",
           [phone_number, first_name, tg_id, date],
           (err, result) => {
