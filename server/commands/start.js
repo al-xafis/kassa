@@ -6,7 +6,7 @@ module.exports = (bot) => {
         keyboard: [
           [{ text: "📥 Deposit" }, { text: "📤 Withdraw" }],
           [{ text: "💰 kurs" }],
-          [{ text: "📞 Contact" }],
+          [{ text: "📞 Contact" }, { text: "📞 History" }],
         ],
         resize_keyboard: true,
       },
