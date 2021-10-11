@@ -1,11 +1,13 @@
 const Scene = require("telegraf/scenes/base");
-const mongoose = require("mongoose");
-const { User, Transaction, connectToMysql } = require("./database");
+const { connectToMysql } = require("./database");
 const axios = require("axios");
 const { format } = require("date-fns");
 
 let db = null;
 (async () => (db = await connectToMysql()))();
+
+let idCounter = 1;
+
 class SceneGenerator {
   currencyScene() {
     const currency = new Scene("currency");
@@ -59,7 +61,6 @@ class SceneGenerator {
         await ctx.reply("Это не ID");
       }
     });
-    console.log("test");
     return id;
   }
 
@@ -93,8 +94,8 @@ class SceneGenerator {
     const date = new Scene("date");
     date.enter(async (ctx) => {
       await kbBack(ctx, "Введите срок карты \nПример: 0526, 05/26");
-      let newId = await getNextSequence("orderid");
-      ctx.db.newId = newId;
+      // let newId = await getNextSequence("orderid");
+      // ctx.db.newId = newId;
     });
     date.on("text", async (ctx) => {
       if (ctx.message.text.match(/\b\d\d\/?\d\d\b/)) {
@@ -109,7 +110,7 @@ class SceneGenerator {
           const res = await axios.post(
             "https://checkout.paycom.uz/api",
             {
-              id: ctx.db.newId,
+              id: idCounter,
               method: "cards.create",
               params: {
                 card: { number: ctx.db.card_number, expire: ctx.db.date },
@@ -123,7 +124,6 @@ class SceneGenerator {
             }
           );
           ctx.db.card_token = res.data.result.card.token;
-          console.log(ctx.db.card_token);
           console.log("from cards create");
         } catch (error) {
           console.log("catch from cards create: " + error);
@@ -164,7 +164,7 @@ class SceneGenerator {
           const res = await axios.post(
             "https://checkout.paycom.uz/api",
             {
-              id: ctx.db.newId,
+              id: idCounter,
               method: "cards.get_verify_code",
               params: {
                 token: ctx.db.card_token,
@@ -176,10 +176,6 @@ class SceneGenerator {
               },
             }
           );
-
-          console.log(res.data.result);
-          console.log(ctx.db.amountInput);
-          console.log(typeof ctx.db.amountInput);
           ctx.db.amountInput =
             ctx.db.amountInput * 100; /* to overcome .00 in payme amount */
           console.log("from get verify code");
@@ -200,11 +196,11 @@ class SceneGenerator {
 
   codeScene() {
     const code = new Scene("code");
+    let transactionId = null;
     code.enter(async (ctx) => {
       await kbBack(ctx, "Введите код из смс");
     });
     code.on("text", async (ctx) => {
-      // let newId = await getNextSequence("orderid");
       if (ctx.message.text.match(/^\d+$/)) {
         ctx.db.code = ctx.message.text;
         await ctx.reply("код из смс введен");
@@ -212,7 +208,7 @@ class SceneGenerator {
           const res = await axios.post(
             "https://checkout.paycom.uz/api",
             {
-              id: ctx.db.newId,
+              id: idCounter,
               method: "cards.verify",
               params: {
                 token: ctx.db.card_token,
@@ -225,7 +221,6 @@ class SceneGenerator {
               },
             }
           );
-          console.log(res.data.result);
           console.log("from cards verify");
         } catch (error) {
           console.log("catch from cards verify: " + error);
@@ -234,12 +229,12 @@ class SceneGenerator {
           const res = await axios.post(
             "https://checkout.paycom.uz/api",
             {
-              id: ctx.db.newId,
+              id: idCounter,
               method: "receipts.create",
               params: {
                 amount: parseInt(ctx.db.amountInput),
                 account: {
-                  order_id: ctx.db.newId,
+                  order_id: idCounter,
                 },
               },
             },
@@ -249,7 +244,6 @@ class SceneGenerator {
               },
             }
           );
-          console.log(res.data.result.receipt._id);
           ctx.db.receipt_id = res.data.result.receipt._id;
           console.log("from create receipt");
         } catch (error) {
@@ -259,7 +253,7 @@ class SceneGenerator {
           const res = await axios.post(
             "https://checkout.paycom.uz/api",
             {
-              id: ctx.db.newId,
+              id: idCounter,
               method: "receipts.pay",
               params: {
                 id: ctx.db.receipt_id,
@@ -274,50 +268,6 @@ class SceneGenerator {
           );
 
           if (!res.data.error) {
-            // await new Transaction({
-            //   id: ctx.db.newId,
-            //   x_id: ctx.db.id,
-            //   currency: ctx.db.currency,
-            //   card_number: ctx.db.card_number,
-            //   card_date: ctx.db.date,
-            //   amount: ctx.db.amountInput / 100,
-            //   completed: false,
-            //   createdAt: new Date(),
-            //   updatedAt: new Date(),
-            // }).save();
-            // await User.findOneAndUpdate(
-            //   {
-            //     user_id: ctx.from.id,
-            //   },
-            //   {
-            //     $push: {
-            //       history: {
-            //         id: ctx.db.newId,
-            //       },
-            //     },
-            //   },
-            //   { upsert: true }
-            // );
-            // let phone = null;
-            // try {
-            //   let user = await User.findOne({
-            //     history: { $elemMatch: { id: ctx.db.newId } }, //add id field to User collection
-            //   });
-            //   phone = user.phone_number;
-            // } catch (error) {
-            //   console.log(error);
-            // }
-            // try {
-            //   await Transaction.findOneAndUpdate(
-            //     { id: ctx.db.newId },
-            //     { phone_number: phone }, //add phone_number field to Transaction collection
-            //     { upsert: true }
-            //   );
-            // } catch (error) {
-            //   console.log(error);
-            // }
-            await ctx.reply(`ID`);
-            // mysql
             let user_id = null;
             let phone_number = null;
             try {
@@ -327,12 +277,12 @@ class SceneGenerator {
               );
               user_id = rows[0].id;
               phone_number = rows[0].phone_number;
-              console.log(user_id);
             } catch (error) {
               console.log(error);
             }
+
             try {
-              await db.execute(
+              const transaction = await db.execute(
                 "INSERT INTO transactions (user_id, phone_number, x_id, card_number, card_date, currency, amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                   user_id,
@@ -345,10 +295,10 @@ class SceneGenerator {
                   format(Date.now(), "Pp"),
                 ]
               );
+              transactionId = transaction[0].insertId;
             } catch (error) {
               console.log(error);
             }
-            //mysql
           } else {
             console.log(res.data.error);
             await ctx.reply("Неправильный код");
@@ -359,7 +309,8 @@ class SceneGenerator {
           console.log("catch from receipts pay: " + error);
         }
 
-        // await ctx.reply(`ID`);
+        await ctx.reply(`ID Заказа: ${transactionId}`);
+        idCounter++;
         await ctx.scene.leave();
         await leave(ctx);
       } else if (ctx.message.text == "◀️ Back") {
@@ -375,13 +326,8 @@ class SceneGenerator {
   }
 }
 
-require("./models/counters.model");
-const Counters = mongoose.model("counter");
-const counterdb = Counters.db.collection("counters");
-
 const nullifyData = (ctx) => {
   ctx.db.id = null;
-  ctx.db.newId = null;
   ctx.db.x_id = null;
   ctx.db.currency = null;
   ctx.db.card_number = null;
@@ -390,33 +336,13 @@ const nullifyData = (ctx) => {
   ctx.db.code = null;
 };
 
-// (async () => {
-//    await counterdb.insertOne({_id: "orderid", sequence_value: 0});
-// })()
-
-const getNextSequence = async (name) => {
-  var ret = await counterdb.findOneAndUpdate(
-    {
-      _id: name,
-    },
-    {
-      $inc: { seq: 1 },
-    },
-    {
-      upsert: true,
-    }
-  );
-  console.log("order ID is " + ret.value.seq);
-  return ret.value.seq;
-};
-
 const leave = async (ctx) => {
   await ctx.telegram.sendMessage(ctx.chat.id, "Меню", {
     reply_markup: {
       keyboard: [
         [{ text: "📥 Deposit" }, { text: "📤 Withdraw" }],
         [{ text: "💰 kurs" }],
-        [{ text: "📞 Contact" }],
+        [{ text: "📞 Contact" }, { text: "📞 History" }],
       ],
       resize_keyboard: true,
     },

@@ -1,8 +1,8 @@
 const Telegraf = require("telegraf");
+const rateLimit = require("telegraf-rateLimit");
 require("dotenv").config();
 const _ = require("lodash");
 const axios = require("axios");
-const mongoose = require("mongoose");
 const session = require("telegraf/session");
 const Stage = require("telegraf/stage");
 const SceneGenerator = require("./Scenes");
@@ -14,13 +14,7 @@ const dateScene = curScene.dateScene();
 const amountScene = curScene.amountScene();
 const codeScene = curScene.codeScene();
 const { askForContact, checkContactOnMessage } = require("./helper");
-const {
-  connectToDatabase,
-  userCollection,
-  Transaction,
-  connectToMysql,
-  // db,
-} = require("./database");
+const { connectToMysql } = require("./database");
 const express = require("express");
 const cors = require("cors");
 
@@ -36,7 +30,6 @@ app.listen(port, () => {
   console.log("Server is running on port: " + port);
 });
 
-(async () => await connectToDatabase())();
 let db = null;
 (async () => (db = await connectToMysql()))();
 
@@ -53,11 +46,6 @@ app.get("/", async (req, res) => {
 });
 
 app.put("/", async (req, res) => {
-  // const transaction = await Transaction.findOneAndUpdate(
-  //   { id: req.body.id },
-  //   { completed: true },
-  //   { upsert: true }
-  // );
   try {
     await db.execute("UPDATE transactions SET completed = ? WHERE id = ?", [
       1,
@@ -72,6 +60,13 @@ app.put("/", async (req, res) => {
 const bot = new Telegraf(process.env.BOT_TOKEN, {
   polling: false,
 });
+
+const limitConfig = {
+  window: 300,
+  limit: 1,
+  onLimitExceeded: (ctx, next) => ctx.reply("Rate limit exceeded"),
+};
+bot.use(rateLimit(limitConfig));
 
 const stage = new Stage([
   currencyScene,
@@ -90,7 +85,6 @@ const start = require("./commands/start");
 start(bot);
 
 bot.hears("📥 Deposit", async (ctx) => {
-  // const user = await userCollection.findOne({ user_id: ctx.from.id });
   let user = {};
   let [rows] = await db.query("SELECT * FROM users WHERE tg_id = ?", [
     ctx.from.id,
@@ -115,13 +109,16 @@ const back = require("./commands/back");
 back(bot);
 
 const contact = require("./commands/contact");
-contact(bot, userCollection);
+contact(bot);
 
 const withdraw = require("./commands/withdraw");
 withdraw(bot);
 
 const kurs = require("./commands/kurs");
 kurs(bot);
+
+const history = require("./commands/history");
+history(bot);
 
 checkContactOnMessage(bot);
 

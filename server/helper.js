@@ -1,4 +1,4 @@
-const { User, connectToMysql } = require("./database");
+const { connectToMysql } = require("./database");
 const { format } = require("date-fns");
 
 let db = null;
